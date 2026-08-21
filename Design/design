@@ -1,0 +1,10 @@
+Order chỉ nên lưu customerId:
+1.Tránh coupling giữa service
+- Nếu Order lưu cả Customer object, Order Service sẽ phụ thuộc vào cấu trúc nội bộ của Customer Service.
+- Khi Customer thay đổi field, Order dễ bị ảnh hưởng dây chuyền.
+
+2. Mỗi service phải sở hữu dữ liệu của mình
+- Một bounded context không sở hữu dữ liệu của context khác
+- Không dùng chung database giữa các service, mỗi service có database riêng.
+
+3. Dễ mở rộng và scale
