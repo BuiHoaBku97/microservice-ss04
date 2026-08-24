@@ -1,8 +1,8 @@
 package startup.vn.orderservice.services;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
+import startup.vn.orderservice.clients.product.ProductCatalogClient;
 import startup.vn.orderservice.dtos.requests.OrderRequestDTO;
 import startup.vn.orderservice.dtos.responses.OrderResponseDTO;
 import startup.vn.orderservice.entities.Order;
@@ -17,15 +17,22 @@ import java.math.RoundingMode;
 @Service
 public class OrderServiceImpl implements OrderService {
 
-    @Autowired
-    private OrderRepository orderRepository;
+    private final OrderRepository orderRepository;
+    private final OrderMapper orderMapper;
+    private final ProductCatalogClient productCatalogClient;
 
-    @Autowired
-    private OrderMapper orderMapper;
+    public OrderServiceImpl(OrderRepository orderRepository,
+                            OrderMapper orderMapper,
+                            ProductCatalogClient productCatalogClient) {
+        this.orderRepository = orderRepository;
+        this.orderMapper = orderMapper;
+        this.productCatalogClient = productCatalogClient;
+    }
 
     @Override
     public OrderResponseDTO createOrder(OrderRequestDTO orderRequestDTO) {
-        var unitPrice = resolveSimulatedUnitPrice(orderRequestDTO.getProductId());
+        var product = productCatalogClient.getProductById(orderRequestDTO.getProductId());
+        var unitPrice = product.price();
         var totalAmount = unitPrice.multiply(BigDecimal.valueOf(orderRequestDTO.getQuantity()))
                 .setScale(2, RoundingMode.HALF_UP);
 
@@ -44,15 +51,5 @@ public class OrderServiceImpl implements OrderService {
         var order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order with id " + id + " not found"));
         return orderMapper.toResponseDTO(order);
-    }
-
-    private BigDecimal resolveSimulatedUnitPrice(Long productId) {
-        return switch (Math.floorMod(productId.intValue(), 5)) {
-            case 0 -> BigDecimal.valueOf(100);
-            case 1 -> BigDecimal.valueOf(150);
-            case 2 -> BigDecimal.valueOf(200);
-            case 3 -> BigDecimal.valueOf(250);
-            default -> BigDecimal.valueOf(300);
-        };
     }
 }

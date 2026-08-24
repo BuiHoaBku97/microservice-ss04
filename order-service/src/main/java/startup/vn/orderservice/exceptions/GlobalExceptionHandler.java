@@ -70,6 +70,18 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ProductServiceUnavailableException.class)
+    public ResponseEntity<ApiResponseError> handleProductServiceUnavailable(ProductServiceUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                new ApiResponseError(
+                        LocalDateTime.now(),
+                        String.valueOf(HttpStatus.SERVICE_UNAVAILABLE.value()),
+                        HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase(),
+                        ex.getMessage()
+                )
+        );
+    }
+
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ApiResponseError> handleDataAccess(DataAccessException ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
