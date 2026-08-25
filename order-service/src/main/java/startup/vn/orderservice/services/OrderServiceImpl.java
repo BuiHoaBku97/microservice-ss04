@@ -7,6 +7,7 @@ import startup.vn.orderservice.dtos.requests.OrderRequestDTO;
 import startup.vn.orderservice.dtos.responses.OrderResponseDTO;
 import startup.vn.orderservice.entities.Order;
 import startup.vn.orderservice.exceptions.OrderSaveException;
+import startup.vn.orderservice.exceptions.ProductServiceUnavailableException;
 import startup.vn.orderservice.exceptions.ResourceNotFoundException;
 import startup.vn.orderservice.mappers.OrderMapper;
 import startup.vn.orderservice.repositories.OrderRepository;
@@ -32,6 +33,12 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponseDTO createOrder(OrderRequestDTO orderRequestDTO) {
         var product = productCatalogClient.getProductById(orderRequestDTO.getProductId());
+        if (product == null || product.price() == null) {
+            throw new ProductServiceUnavailableException(
+                    "Dịch vụ sản phẩm hiện không khả dụng, vui lòng thử lại sau",
+                    null
+            );
+        }
         var unitPrice = product.price();
         var totalAmount = unitPrice.multiply(BigDecimal.valueOf(orderRequestDTO.getQuantity()))
                 .setScale(2, RoundingMode.HALF_UP);
