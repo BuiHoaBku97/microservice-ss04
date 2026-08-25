@@ -1,6 +1,7 @@
 package startup.vn.productservice.controllers;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +15,8 @@ import startup.vn.productservice.dtos.responses.ProductResponseDTO;
 import startup.vn.productservice.services.ProductService;
 
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.List;
 
 @RestController
@@ -21,21 +24,29 @@ import java.util.List;
 @Validated
 public class ProductController {
 
+    private static final Logger log = LoggerFactory.getLogger(ProductController.class);
+
     @Autowired
     private ProductService productService;
 
+    @Value("${server.port}")
+    private String serverPort;
+
     @PostMapping
     public ResponseEntity<ProductResponseDTO> createProduct(@Valid @RequestBody ProductRequestDTO productRequestDTO) {
+        log.info("POST /api/v1/products handled by PRODUCT-SERVICE on port {}", serverPort);
         return ResponseEntity.ok(productService.createProduct(productRequestDTO));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponseDTO> getProductById(@PathVariable Integer id) {
+        log.info("GET /api/v1/products/{} handled by PRODUCT-SERVICE on port {}", id, serverPort);
         return ResponseEntity.ok(productService.getProductById(id));
     }
 
     @GetMapping
     public ResponseEntity<List<ProductResponseDTO>> getAllProducts() {
+        log.info("GET /api/v1/products handled by PRODUCT-SERVICE on port {}", serverPort);
         return ResponseEntity.ok(productService.getAllProducts());
     }
 }
