@@ -2,14 +2,19 @@ package startup.vn.orderservice.clients.product;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.test.web.client.MockRestServiceServer;
-import startup.vn.orderservice.exceptions.ResourceNotFoundException;
+import org.springframework.web.client.RestTemplate;
 import startup.vn.orderservice.exceptions.ProductServiceUnavailableException;
+import startup.vn.orderservice.exceptions.ResourceNotFoundException;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -18,23 +23,34 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.http.HttpMethod.GET;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class ProductCatalogClientTest {
 
     private RestTemplate restTemplate;
     private MockRestServiceServer mockServer;
+
+    @Mock
+    private DiscoveryClient discoveryClient;
+
     private ProductCatalogClient productCatalogClient;
 
     @BeforeEach
     void setUp() {
         restTemplate = new RestTemplate();
         mockServer = MockRestServiceServer.bindTo(restTemplate).build();
-        productCatalogClient = new ProductCatalogClient(restTemplate, "http://product-service", false);
+        productCatalogClient = new ProductCatalogClient(restTemplate, discoveryClient, false);
+    }
+
+    private void stubProductServiceDiscovery() {
+        when(discoveryClient.getInstances("PRODUCT-SERVICE")).thenReturn(List.of(org.mockito.Mockito.mock(org.springframework.cloud.client.ServiceInstance.class)));
     }
 
     @Test
     void getProductByIdShouldReturnProductFromApi() {
-        mockServer.expect(requestTo("http://product-service/api/v1/products/12"))
+        stubProductServiceDiscovery();
+        mockServer.expect(requestTo("http://PRODUCT-SERVICE/api/v1/products/12"))
                 .andExpect(method(GET))
                 .andRespond(withSuccess("""
                         {
@@ -57,7 +73,8 @@ class ProductCatalogClientTest {
 
     @Test
     void getProductByIdShouldTranslateNotFound() {
-        mockServer.expect(requestTo("http://product-service/api/v1/products/99"))
+        stubProductServiceDiscovery();
+        mockServer.expect(requestTo("http://PRODUCT-SERVICE/api/v1/products/99"))
                 .andExpect(method(GET))
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
                         .withStatus(HttpStatus.NOT_FOUND));
@@ -69,7 +86,8 @@ class ProductCatalogClientTest {
 
     @Test
     void getProductByIdShouldTranslateConnectionFailure() {
-        mockServer.expect(requestTo("http://product-service/api/v1/products/7"))
+        stubProductServiceDiscovery();
+        mockServer.expect(requestTo("http://PRODUCT-SERVICE/api/v1/products/7"))
                 .andExpect(method(GET))
                 .andRespond(withException(new IOException("Connection refused")));
 
@@ -80,8 +98,9 @@ class ProductCatalogClientTest {
 
     @Test
     void getProductByIdShouldReturnFallbackWhenEnabled() {
-        productCatalogClient = new ProductCatalogClient(restTemplate, "http://product-service", true);
-        mockServer.expect(requestTo("http://product-service/api/v1/products/8"))
+        stubProductServiceDiscovery();
+        productCatalogClient = new ProductCatalogClient(restTemplate, discoveryClient, true);
+        mockServer.expect(requestTo("http://PRODUCT-SERVICE/api/v1/products/8"))
                 .andExpect(method(GET))
                 .andRespond(withException(new IOException("Connection refused")));
 
@@ -93,5 +112,12 @@ class ProductCatalogClientTest {
         assertEquals(0, product.stockQuantity());
 
         mockServer.verify();
+    }
+
+    @Test
+    void getProductByIdShouldReturnUnavailableWhenDiscoveryHasNoInstances() {
+        when(discoveryClient.getInstances("PRODUCT-SERVICE")).thenReturn(List.of());
+
+        assertThrows(ProductServiceUnavailableException.class, () -> productCatalogClient.getProductById(10L));
     }
 }

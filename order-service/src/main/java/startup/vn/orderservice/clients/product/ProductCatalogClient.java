@@ -1,6 +1,8 @@
 package startup.vn.orderservice.clients.product;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
@@ -19,23 +21,25 @@ import org.slf4j.LoggerFactory;
 public class ProductCatalogClient {
 
     private static final Logger log = LoggerFactory.getLogger(ProductCatalogClient.class);
+    private static final String PRODUCT_SERVICE_ID = "PRODUCT-SERVICE";
 
     private final RestTemplate restTemplate;
-    private final String productServiceBaseUrl;
+    private final DiscoveryClient discoveryClient;
     private final boolean fallbackEnabled;
 
     public ProductCatalogClient(RestTemplate restTemplate,
-                                @Value("${product.service.base-url}") String productServiceBaseUrl,
+                                DiscoveryClient discoveryClient,
                                 @Value("${product.service.fallback.enabled:false}") boolean fallbackEnabled) {
         this.restTemplate = restTemplate;
-        this.productServiceBaseUrl = productServiceBaseUrl;
+        this.discoveryClient = discoveryClient;
         this.fallbackEnabled = fallbackEnabled;
     }
 
     public ProductResponseDTO getProductById(Long productId) {
+        ensureProductServiceAvailable();
         try {
             var product = restTemplate.getForObject(
-                    productServiceBaseUrl + "/api/v1/products/{id}",
+                    "http://PRODUCT-SERVICE/api/v1/products/{id}",
                     ProductResponseDTO.class,
                     productId
             );
@@ -55,6 +59,17 @@ public class ProductCatalogClient {
         } catch (ResourceAccessException ex) {
             return handleUnavailable(productId, ex);
         }
+    }
+
+    private void ensureProductServiceAvailable() {
+        var instances = discoveryClient.getInstances(PRODUCT_SERVICE_ID);
+        if (instances == null || instances.isEmpty()) {
+            throw new ProductServiceUnavailableException(
+                    "PRODUCT-SERVICE is not available in Eureka",
+                    null
+            );
+        }
+        log.debug("PRODUCT-SERVICE has {} instance(s) in Eureka", instances.size());
     }
 
     private ProductResponseDTO handleUnavailable(Long productId, Exception ex) {
